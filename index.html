@@ -147,10 +147,24 @@ function v14Options(relation){
  return V14_RELATIONS.map(r=>`<option value="${E(r)}" ${r===relation?'selected':''}>${E(r)}</option>`).join('');
 }
 const contactClassName=value=>String(value??'').normalize('NFKC').trim().replace(/^(?:class|grade)\s*[-:]?\s*/i,'').replace(/[۰-۹٠-٩]/g,c=>String('۰۱۲۳۴۵۶۷۸۹'.includes(c)?'۰۱۲۳۴۵۶۷۸۹'.indexOf(c):'٠١٢٣٤٥٦٧٨٩'.indexOf(c))).toLowerCase();
+// Registration searches accept local digits, spaces, separators and leading zeroes.
+function contactSearchText(value){
+ return String(value??'').normalize('NFKC').replace(/[۰-۹٠-٩]/g,c=>String('۰۱۲۳۴۵۶۷۸۹'.includes(c)?'۰۱۲۳۴۵۶۷۸۹'.indexOf(c):'٠١٢٣٤٥٦٧٨٩'.indexOf(c))).trim().toLowerCase();
+}
+function contactMatchesSearch(student,query){
+ const q=contactSearchText(query);if(!q)return true;
+ const admission=contactSearchText(student.admissionNo);
+ if(admission.includes(q)||contactSearchText(student.name).includes(q))return true;
+ const compact=value=>value.replace(/[\s\-/]/g,'');
+ const reg=compact(admission),term=compact(q);
+ if(!term)return false;
+ if(reg.includes(term))return true;
+ return /^\d+$/.test(reg)&&/^\d+$/.test(term)&&reg.replace(/^0+(?=\d)/,'')===term.replace(/^0+(?=\d)/,'');
+}
 function contactStudents(){return roster.filter(s=>s&&s.admissionNo!=null&&s.name)}
 function contactPage(numberFilter=''){
  $('content').innerHTML=`<div id="contactsModule" data-number-filter="${E(numberFilter)}"><div class="contact-heading"><h2>📞 Student Mobile Database</h2><p>Choose a class to see every student, including students without a saved number.</p></div>
- <div class="grid contact-filters"><div><label for="cclass">Class</label><select id="cclass">${opts(['Nursery','Prep','1','2','3','4','5','6','7','8'],'All Classes — Select or Search')}</select></div><div><label for="csearch">Admission No / Student Name</label><input id="csearch" placeholder="Search admission number or student name" autocomplete="off"></div></div>
+ <div class="grid contact-filters"><div><label for="cclass">Class</label><select id="cclass">${opts(['Nursery','Prep','1','2','3','4','5','6','7','8'],'All Classes — Select or Search')}</select></div><div><label for="csearch">Registration / Admission No / Student Name</label><input id="csearch" placeholder="Search registration / admission number or student name" autocomplete="off"></div></div>
  <div class="v13stats contact-number-tabs" role="group" aria-label="Filter students by mobile number">
  <button type="button" class="v13stat contact-number-tab" data-contact-filter="all" aria-pressed="false">All Students<b id="contactAllCount">${contactStudents().length}</b></button>
  <button type="button" class="v13stat contact-number-tab" data-contact-filter="with" aria-pressed="false">With Number<b id="contactWithCount">${contactStudents().filter(s=>v14Phones(s).length).length}</b></button>
@@ -159,7 +173,7 @@ function contactPage(numberFilter=''){
  <div class="notice">Students missing from the available roster cannot appear through filtering. ${profile?.role==='admin'?'If needed, import the Full JSON Backup from the original app below. Existing saved numbers are kept.':'Ask Admin to import the original full roster if students are missing.'}</div>
  ${profile?.role==='admin'?'<div class="actions" style="margin:14px 0"><button id="cimport" class="secondary" type="button">📂 Import Full Student Backup</button><input id="cimportFile" type="file" accept=".json,application/json" hidden></div>':''}
  <div id="contactSummary" class="contact-summary" role="status" aria-live="polite"></div><div class="list" id="contactRows"></div></div>`;
- $('csearch').oninput=drawContacts;$('cclass').onchange=drawContacts;
+ $('csearch').oninput=()=>{if($('csearch').value.trim()){$('cclass').value='';$('contactsModule').dataset.numberFilter='all'}drawContacts()};$('cclass').onchange=drawContacts;
  document.querySelectorAll('[data-contact-filter]').forEach(button=>button.onclick=()=>{
   $('contactsModule').dataset.numberFilter=button.dataset.contactFilter;drawContacts();
  });
@@ -195,9 +209,9 @@ function refreshContactTabs(){
 }
 function drawContacts(){
  const numberFilter=refreshContactTabs();
- const q=$('csearch').value.trim().toLowerCase(),cls=$('cclass').value;
+ const q=$('csearch').value.trim(),cls=$('cclass').value;
   if(!cls&&!q&&!numberFilter){$('contactSummary').textContent='';$('contactRows').innerHTML='<div class="notice">Choose With Number / Without Number / All Students, select a class, or search by admission number / student name.</div>';return}
- const filtered=contactStudents().filter(s=>(!cls||contactClassName(s.className)===contactClassName(cls))&&(!q||[s.admissionNo,s.name].join(' ').toLowerCase().includes(q))&&(numberFilter==='with'?v14Phones(s).length>0:numberFilter==='without'?v14Phones(s).length===0:true)).sort((a,b)=>String(a.admissionNo).localeCompare(String(b.admissionNo),undefined,{numeric:true}));
+ const filtered=contactStudents().filter(s=>(!cls||contactClassName(s.className)===contactClassName(cls))&&contactMatchesSearch(s,q)&&(numberFilter==='with'?v14Phones(s).length>0:numberFilter==='without'?v14Phones(s).length===0:true)).sort((a,b)=>String(a.admissionNo).localeCompare(String(b.admissionNo),undefined,{numeric:true}));
  $('contactSummary').textContent=filtered.length+' students · '+filtered.filter(s=>v14Phones(s).length).length+' with numbers · '+filtered.filter(s=>!v14Phones(s).length).length+' without numbers';
   $('contactRows').innerHTML=filtered.map(s=>{
   const savedPhones=v14Phones(s);
