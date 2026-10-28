@@ -371,7 +371,7 @@ function mergeCloudRows(rows){
   const byWeekly=new Map(weekly.map(x=>[String(x.id),x]));
   const byAssess=new Map(assess.map(x=>[String(x.id),x]));
   for(const r of rows){if(pending.has(r.record_type+':'+r.record_id))continue;const d=r.payload;
-    if(r.record_type==='student'&&d?.admissionNo){const prev=byNo.get(String(d.admissionNo));byNo.set(String(d.admissionNo),{...(prev||{}),...d,mobile:(d.mobile||prev?.mobile||'')})}
+    if(r.record_type==='student'&&d?.admissionNo){const prev=byNo.get(String(d.admissionNo));byNo.set(String(d.admissionNo),{...(prev||{}),...d,mobile:(Object.prototype.hasOwnProperty.call(d,'mobile')?d.mobile:(prev?.mobile||''))})}
     if(r.record_type==='weekly'&&d?._deleted)byWeekly.delete(String(r.record_id));else if(r.record_type==='weekly'&&d?.id)byWeekly.set(String(d.id),d);
     if(r.record_type==='assessment'&&d?._deleted)byAssess.delete(String(r.record_id));else if(r.record_type==='assessment'&&d?.id)byAssess.set(String(d.id),d);
   }
